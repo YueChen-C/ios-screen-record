@@ -9,10 +9,11 @@ from time import sleep, time
 import usb
 from usb.core import Configuration
 
-from .coremedia.consumer import AVFileWriter, SocketUDP
+from .coremedia.consumer import AVFileWriter, SocketUDP, GstAdapter
 from packet.meaasge import MessageProcessor
 
-logging.basicConfig(level=logging.INFO,format='%(asctime)s - %(filename)s[line:%(lineno)d] - %(levelname)s: %(message)s')
+logging.basicConfig(level=logging.INFO,
+                    format='%(asctime)s - %(filename)s[line:%(lineno)d] - %(levelname)s: %(message)s')
 
 
 class iOSDevice:
@@ -50,6 +51,7 @@ def find_ios_device(udid=None):
     else:
         for device in devices:
             if udid in device.serial_number:
+                logging.info(f'Find Device UDID: {device.serial_number}')
                 _device = device
     if not _device:
         raise Exception(f'not find {udid}')
@@ -79,6 +81,7 @@ def disable_qt_config(device):
     :param device:
     :return:
     """
+    logging.info('Enabling hidden QT config')
     val = device.ctrl_transfer(0x40, 0x52, 0, 0, b'')
     if val:
         logging.warning('Failed sending control transfer for enabling hidden QT config')
@@ -108,46 +111,57 @@ class ByteStream:
         return _byte
 
 
-def record_wav(device, h264FilePath, wavFilePath, audioOnly):
-    consumer = AVFileWriter(h264FilePath=h264FilePath, wavFilePath=wavFilePath, audioOnly=audioOnly)
-    stopSignal = threading.Event()
-    start_reading(consumer, device, stopSignal)
-
-
-def send_udp(device, audioOnly):
-    consumer = SocketUDP(audioOnly=audioOnly)
-    stopSignal = threading.Event()
-    start_reading(consumer, device, stopSignal)
-
-
-def start_reading(consumer, device, stopSignal: threading.Event = None):
-    stopSignal = stopSignal or threading.Event()
-
+def register_signal(stopSignal):
     def shutdown(num, frame):
         stopSignal.set()
 
     for sig in [signal.SIGINT, signal.SIGHUP, signal.SIGTERM]:
         signal.signal(sig, shutdown)
 
+
+def record_wav(device, h264FilePath, wavFilePath, audioOnly):
+    consumer = AVFileWriter(h264FilePath=h264FilePath, wavFilePath=wavFilePath, audioOnly=audioOnly)
+    stopSignal = threading.Event()
+    register_signal(stopSignal)
+    start_reading(consumer, device, stopSignal)
+
+
+def send_udp(device, audioOnly):
+    consumer = SocketUDP(audioOnly=audioOnly)
+    stopSignal = threading.Event()
+    register_signal(stopSignal)
+    start_reading(consumer, device, stopSignal)
+
+
+def record_gstAdapter(device):
+    stopSignal = threading.Event()
+    register_signal(stopSignal)
+    consumer = GstAdapter.new()
+    _thread.start_new_thread(start_reading, (consumer, device, stopSignal,))
+    consumer.loop.run()
+
+
+def start_reading(consumer, device, stopSignal: threading.Event = None):
+    stopSignal = stopSignal or threading.Event()
     disable_qt_config(device)
     device.set_configuration()
     logging.info("enable_qt_config..")
     device = enable_qt_config(device)
-    QTConfigIndex = 0
-    QTConfig = None
+    config_index = 0
+    qt_config = None
     for i in range(device.bNumConfigurations):
         _config = Configuration(device, i)
-        QTConfig = usb.util.find_descriptor(_config, bInterfaceSubClass=0x2A)
-        if QTConfig:
-            QTConfigIndex = i + 1
+        qt_config = usb.util.find_descriptor(_config, bInterfaceSubClass=0x2A)
+        if qt_config:
+            config_index = i + 1
             break
-    device.set_configuration(QTConfigIndex)
+    device.set_configuration(config_index)
     device.ctrl_transfer(0x02, 0x01, 0, 0x86, b'')
     device.ctrl_transfer(0x02, 0x01, 0, 0x05, b'')
-    if not QTConfig:
+    if not qt_config:
         raise Exception('Find QTConfig Error')
     inEndpoint = outEndpoint = None
-    for i in QTConfig:
+    for i in qt_config:
         if usb.util.endpoint_direction(i.bEndpointAddress) == usb.util.ENDPOINT_IN:
             inEndpoint = i  # 入口端点
         if usb.util.endpoint_direction(i.bEndpointAddress) == usb.util.ENDPOINT_OUT:
@@ -167,9 +181,12 @@ def start_reading(consumer, device, stopSignal: threading.Event = None):
         while True:
             try:
                 data = device.read(inEndpoint, 1024 * 1024, 5000)
+                sleep(0.01)
                 byteStream.put(data)
             except Exception as E:
-                logging.error(E)
+                logging.warning(E)
+                message.outEndpoint = None
+                message.inEndpoint = None
                 stopSignal.set()
                 break
 
@@ -189,50 +206,5 @@ def start_reading(consumer, device, stopSignal: threading.Event = None):
     while not stopSignal.wait(1):
         pass
     message.CloseSession()
-    consumer.stop()
     disable_qt_config(device)
-
-
-
-
-if __name__ == '__main__':
-    # # devices = usb.core.find(find_all=True)
-    # # devices = usb.core.find(find_all=True)
-    # # devices.get_active_configuration()
-    device = find_ios_device('9a4597f837b52349346008e14fd081a1e2e3840d')
-    # send_udp(device,False)
-    record_wav(device, './test2.h264', './test2.wav', False)
-    # disable_qt_config(device)
-    # device.set_configuration()
-    # device = enable_qt_config(device)
-    # device.set_configuration(6)
-    # device.ctrl_transfer(0x02, 0x01, 0, 0x86, b'')
-    # device.ctrl_transfer(0x02, 0x01, 0, 0x05, b'')
-    # # print(device)
-    # # cfg = device.get_active_configuration()
-    # # intf = cfg[(0,0)]
-    # # print(intf)
-    # # 获取配置 CONFIGURATION 6 的具体数据
-    # config = Configuration(device, 5)
-    # # 获取 QuickTime Interface 节点内容
-    #
-    # qt_interface = usb.util.find_descriptor(config, bInterfaceSubClass=0x2A)
-    # # print(qt_interface)
-    # inEndpoint = outEndpoint = None
-    # for i in qt_interface:
-    #     if usb.util.endpoint_direction(i.bEndpointAddress) == usb.util.ENDPOINT_IN:
-    #         # 入口端点
-    #         inEndpoint = i
-    #     if usb.util.endpoint_direction(i.bEndpointAddress) == usb.util.ENDPOINT_OUT:
-    #         # 出口端点
-    #         outEndpoint = i
-    # if not inEndpoint or not outEndpoint:
-    #     raise Exception('could not get InEndpoint or outEndpoint')
-    #
-    # logging.info("Device '%s' USB connection ready, waiting for ping..")
-    # print(inEndpoint,outEndpoint)
-    # while True:
-    #     ret = device.read(inEndpoint, 4096, 10000)
-    #     # _length = struct.unpack('<I', ret)[0]
-    #     # data = device.read(inEndpoint, _length - 1, 1000)
-    #     print(ret)
+    consumer.stop()

@@ -42,6 +42,12 @@ class fmtSubChunk(Structure):
 
 
 def set_wav_header(_length, wavFile):
+    buf = get_wav_header(_length)
+    wavFile.seek(0)
+    wavFile.write(buf)
+
+
+def get_wav_header(_length):
     buf = b''
     riff = riffHeader.new(_length)
     buf += bytes(riff)
@@ -49,5 +55,4 @@ def set_wav_header(_length, wavFile):
     buf += bytes(fmt)
     buf += struct.pack('>I', 0x64617461)
     buf += struct.pack('<I', _length)
-    wavFile.seek(0)
-    wavFile.write(buf)
+    return buf

@@ -10,7 +10,10 @@ import socket
 
 from .CMFormatDescription import DescriptorConst
 from .CMSampleBuffer import CMSampleBuffer
-from .wav import set_wav_header
+from .gstadapter import setup_video_pipeline, setup_audio_pipeline, setup_live_playAudio, run_main_loop
+from .wav import set_wav_header, get_wav_header
+from gi.repository import Gst, GObject, GLib
+import _thread
 
 startCode = b'\x00\x00\x00\x01'
 
@@ -120,3 +123,86 @@ class SocketUDP(Consumer):
 
     def stop(self):
         self.socket_udp.close()
+
+
+class GstAdapter(Consumer):
+    audioAppSrcTargetElementName = "audio_target"
+    videoAppSrcTargetElementName = "video_target"
+    MP3 = "mp3"
+    OGG = "ogg"
+
+    def __init__(self, videoAppSrc, audioAppSrc, firstAudioSample, loop=None,pipeline=None):
+        self.videoAppSrc = videoAppSrc
+        self.audioAppSrc = audioAppSrc
+        self.firstAudioSample = firstAudioSample
+        self.pipeline = pipeline
+        self.loop = loop
+
+    @classmethod
+    def new(cls):
+        Gst.init(None)
+        logging.info("Starting Gstreamer..")
+        pipe = Gst.Pipeline.new("QT_Hack_Pipeline")
+        videoAppSrc = setup_video_pipeline(pipe)
+        audioAppSrc = setup_audio_pipeline(pipe)
+        setup_live_playAudio(pipe)
+        pipe.set_state(Gst.State.PLAYING)
+        loop = run_main_loop(pipe)
+        # _thread.start_new_thread(run_main_loop, (pipe,))
+        logging.info("Gstreamer is running!")
+        return cls(videoAppSrc, audioAppSrc, True,loop)
+
+    def consume(self, data: CMSampleBuffer):
+        if data.MediaType == DescriptorConst.MediaTypeSound:
+            if self.firstAudioSample:
+                self.firstAudioSample = False
+                self.sendWavHeader()
+            return self.sendAudioSample(data)
+
+        if data.OutputPresentationTimestamp.CMTimeValue > 17446044073700192000:
+            data.OutputPresentationTimestamp.CMTimeValue = 0
+
+        if data.HasFormatDescription:
+            data.OutputPresentationTimestamp.CMTimeValue = 0
+            self.writeNalu(startCode + data.FormatDescription.PPS, data)
+            self.writeNalu(startCode + data.FormatDescription.SPS, data)
+        self.writeNalus(data)
+
+    def writeNalus(self, data: CMSampleBuffer):
+        buf = data.SampleData
+        if buf:
+            while len(buf) > 0:
+                _length = struct.unpack('>I', buf[:4])[0]
+                self.writeNalu(startCode + buf[4:_length + 4], data)
+                buf = buf[_length + 4:]
+        return True
+
+    def writeNalu(self, buf, data: CMSampleBuffer):
+        gstBuf = Gst.Buffer.new_allocate(None, len(buf), None)
+        gstBuf.pts = data.OutputPresentationTimestamp.CMTimeValue
+        gstBuf.dts = 0
+        gstBuf.fill(0, buf)
+        self.videoAppSrc.emit('push-buffer', gstBuf)
+
+    def sendWavHeader(self):
+        wav_header = get_wav_header(100)
+        gstBuf = Gst.Buffer.new_allocate(None, len(wav_header), None)
+        gstBuf.pts = 0
+        gstBuf.dts = 0
+        gstBuf.fill(0, wav_header)
+        self.audioAppSrc.emit('push-buffer', gstBuf)
+
+    def sendAudioSample(self, data: CMSampleBuffer):
+        gstBuf = Gst.Buffer.new_allocate(None, len(data.SampleData), None)
+        gstBuf.pts = data.OutputPresentationTimestamp.CMTimeValue
+        gstBuf.dts = 0
+        gstBuf.fill(0, data.SampleData)
+        self.audioAppSrc.emit('push-buffer', gstBuf)
+
+    def stop(self):
+        if self.audioAppSrc:
+            self.audioAppSrc.send_event(Gst.Event.new_eos())
+        if self.videoAppSrc:
+            self.videoAppSrc.send_event(Gst.Event.new_eos())
+        if not self.pipeline:
+            return

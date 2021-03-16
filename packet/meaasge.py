@@ -162,14 +162,15 @@ class MessageProcessor:
 
     def CloseSession(self):
         logging.info("Telling device to stop streaming..")
-        self.usbWrite(AsynHPA0(self.deviceAudioClockRef))
-        self.usbWrite(AsynHPD0())
-        while not self.releaseWaiter.wait(5):
-            logging.warning("Timed out waiting for device closing")
-            break
-        logging.info("Waiting for device to tell us to stop..")
-        self.usbWrite(AsynHPD0())
-        logging.info("Ready to release USB Device.")
+        if self.outEndpoint:
+            self.usbWrite(AsynHPA0(self.deviceAudioClockRef))
+            self.usbWrite(AsynHPD0())
+            while not self.releaseWaiter.wait(5):
+                logging.warning("Timed out waiting for device closing")
+                break
+            logging.info("Waiting for device to tell us to stop..")
+            self.usbWrite(AsynHPD0())
+            logging.info("Ready to release USB Device.")
 
     def stop(self):
         self.stopSignal.set()
