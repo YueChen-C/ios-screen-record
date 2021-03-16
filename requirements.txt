@@ -1,1 +1,4 @@
+PyGObject==3.38.0
+PyGObject-stubs==0.0.2
 pyusb==1.1.1
+

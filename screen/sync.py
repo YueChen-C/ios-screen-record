@@ -1,3 +1,6 @@
+""" 需要同步并进行数据回调的包
+"""
+
 import enum
 import struct
 
@@ -7,7 +10,7 @@ from .coremedia.common import NSNumber
 from .coremedia.serialize import SerializeStringKeyDict, new_string_dict_from_bytes, parse_header
 
 
-def ParseSyncHeader(buffer, message_magic):
+def parse_sync_header(buffer, message_magic):
     remainingBytes, clockRef = parse_header(buffer, SyncConst.SyncPacketMagic, message_magic)
     correlationID = struct.unpack('<Q', remainingBytes[:8])[0]
     return remainingBytes[8:], clockRef, correlationID
@@ -35,14 +38,14 @@ class SyncPacket:
 
     @classmethod
     def from_bytes(self, buffer):
-        remainingBytes, ClockRef, CorrelationID, = ParseSyncHeader(buffer, self.messageMagic)
+        remainingBytes, ClockRef, CorrelationID, = parse_sync_header(buffer, self.messageMagic)
         return self(ClockRef,CorrelationID)
 
     def __str__(self):
         return f"SyncSkewPacket >> ClockRef:{self.ClockRef}, CorrelationID:{self.CorrelationID}"
 
 
-def clockRefReply(clockRef, CorrelationID):
+def clock_ref_reply(clockRef, CorrelationID):
     packet_bytes = b''
     packet_bytes += struct.pack('<I', 28)
     packet_bytes += struct.pack('<I', SyncConst.ReplyPacketMagic)
@@ -80,7 +83,7 @@ class SyncAfmtPacket(SyncPacket):
 
     @classmethod
     def from_bytes(self, buffer):
-        remainingBytes, ClockRef, CorrelationID, = ParseSyncHeader(buffer, self.messageMagic)
+        remainingBytes, ClockRef, CorrelationID, = parse_sync_header(buffer, self.messageMagic)
         AudioStream = AudioStreamBasicDescription.from_buffer_copy(remainingBytes)
         return self(ClockRef, CorrelationID,AudioStream)
 
@@ -94,11 +97,11 @@ class SyncClockPacket(SyncPacket):
         self.CorrelationID = CorrelationID
 
     def to_bytes(self, clockRef):
-        return clockRefReply(clockRef, self.CorrelationID)
+        return clock_ref_reply(clockRef, self.CorrelationID)
 
     @classmethod
     def from_bytes(self, buffer):
-        remainingBytes, ClockRef, CorrelationID, = ParseSyncHeader(buffer, SyncConst.CLOK)
+        remainingBytes, ClockRef, CorrelationID, = parse_sync_header(buffer, SyncConst.CLOK)
         return self(ClockRef,CorrelationID)
 
     def __str__(self):
@@ -116,11 +119,11 @@ class SyncCvrpPacket(SyncPacket):
         self.Payload = Payload
 
     def to_bytes(self, clockRef):
-        return clockRefReply(clockRef, self.CorrelationID)
+        return clock_ref_reply(clockRef, self.CorrelationID)
 
     @classmethod
     def from_bytes(self, buffer):
-        remainingBytes, ClockRef, CorrelationID, = ParseSyncHeader(buffer, SyncConst.CVRP)
+        remainingBytes, ClockRef, CorrelationID, = parse_sync_header(buffer, SyncConst.CVRP)
         Payload = new_string_dict_from_bytes(remainingBytes[8:])
         DeviceClockRef = struct.unpack('<Q', remainingBytes[:8])[0]
         return self(ClockRef, CorrelationID,DeviceClockRef,Payload)
@@ -139,11 +142,11 @@ class SyncCwpaPacket(SyncPacket):
         self.DeviceClockRef = DeviceClockRef
 
     def to_bytes(self, clockRef):
-        return clockRefReply(clockRef, self.CorrelationID)
+        return clock_ref_reply(clockRef, self.CorrelationID)
 
     @classmethod
     def from_bytes(self, buffer):
-        remainingBytes, ClockRef, CorrelationID, = ParseSyncHeader(buffer, SyncConst.CWPA)
+        remainingBytes, ClockRef, CorrelationID, = parse_sync_header(buffer, SyncConst.CWPA)
         DeviceClockRef = struct.unpack('<Q', remainingBytes[:8])[0]
         return self(ClockRef, CorrelationID,DeviceClockRef)
 
@@ -170,7 +173,7 @@ class SyncOGPacket(SyncPacket):
 
     @classmethod
     def from_bytes(self, buffer):
-        remainingBytes, ClockRef, CorrelationID, = ParseSyncHeader(buffer, SyncConst.OG)
+        remainingBytes, ClockRef, CorrelationID, = parse_sync_header(buffer, SyncConst.OG)
         Unknown = struct.unpack('<I', remainingBytes[:4])[0]
         return self(ClockRef, CorrelationID,Unknown)
 

@@ -9,7 +9,7 @@ class PingConst(enum.IntEnum):
 
 
 def new_ping_packet_bytes():
-    """default Ping packet
+    """default Ping screen
     :return:
     """
     packet_bytes = b''

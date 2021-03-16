@@ -8,7 +8,7 @@ from .coremedia.common import NSNumber
 from .coremedia.serialize import SerializeStringKeyDict, parse_key_value_dict, parse_header
 
 
-def ParseAsynHeader(buffer, message_magic):
+def parse_asyn_header(buffer, message_magic):
     return parse_header(buffer, AyncConst.AsyncPacketMagic, message_magic)
 
 
@@ -16,27 +16,19 @@ class AyncConst(enum.IntEnum):
     AsyncPacketMagic = 0x6173796E
     FEED = 0x66656564  # These contain CMSampleBufs which contain raw h264 Nalus
     TJMP = 0x746A6D70
-    SRAT = 0x73726174  # CMTimebaseSetRateAndAnchorTime https:#developer.apple.com/documentation/coremedia/cmtimebase?language=objc
-    SPRP = 0x73707270  # Set Property
-    TBAS = 0x74626173  # TimeBase https:#developer.apple.com/library/archive/qa/qa1643/_index.html
+    SRAT = 0x73726174
+    SPRP = 0x73707270
+    TBAS = 0x74626173
     RELS = 0x72656C73
-    HPD1 = 0x68706431  # hpd1 - 1dph | For specifying/requesting the video format
-    HPA1 = 0x68706131  # hpa1 - 1aph | For specifying/requesting the audio format
-    NEED = 0x6E656564  # need - deen
-    EAT = 0x65617421  # contains audio sbufs
+    HPD1 = 0x68706431
+    HPA1 = 0x68706131
+    NEED = 0x6E656564
+    EAT = 0x65617421
     HPD0 = 0x68706430
     HPA0 = 0x68706130
 
 
-def SerializeAudioStreamBasicDescription():
-    packet_bytes = AudioStreamBasicDescription(FormatFlags=12,
-                                               BytesPerPacket=4, FramesPerPacket=1, BytesPerFrame=4, ChannelsPerFrame=2,
-                                               BitsPerChannel=16, Reserved=0,
-                                               SampleRate=48000)
-    return packet_bytes.to_bytes()
-
-
-def CreateHpd1DeviceInfoDict():
+def create_hpd1_device():
     resultDict = {
         'Valeria': True,
         'HEVCDecoderSupports444': True
@@ -49,7 +41,7 @@ def CreateHpd1DeviceInfoDict():
     return resultDict
 
 
-def CreateHpa1DeviceInfoDict():
+def create_hpa1_device():
     AudioBytes = AudioStreamBasicDescription(FormatFlags=12,
                                              BytesPerPacket=4, FramesPerPacket=1, BytesPerFrame=4, ChannelsPerFrame=2,
                                              BitsPerChannel=16, Reserved=0,
@@ -67,7 +59,7 @@ def CreateHpa1DeviceInfoDict():
     return resultDict
 
 
-def newAsynDictPacket(stringKeyDict, subtypeMarker, asynTypeHeader):
+def new_asyn_dict_packet(stringKeyDict, subtypeMarker, asynTypeHeader):
     serialize = SerializeStringKeyDict(stringKeyDict).to_bytes()
     _length = len(serialize) + 20
     packet_bytes = b''
@@ -79,7 +71,7 @@ def newAsynDictPacket(stringKeyDict, subtypeMarker, asynTypeHeader):
     return packet_bytes
 
 
-def AsynNeedPacketBytes(clockRef):
+def asyn_need_packet_bytes(clockRef):
     packet_bytes = b''
     packet_bytes += struct.pack('<I', 20)
     packet_bytes += struct.pack('<I', AyncConst.AsyncPacketMagic)
@@ -88,7 +80,7 @@ def AsynNeedPacketBytes(clockRef):
     return packet_bytes
 
 
-def AsynHPA0(clockRef):
+def asyn_hpa0(clockRef):
     packet_bytes = b''
     packet_bytes += struct.pack('<I', 20)
     packet_bytes += struct.pack('<I', AyncConst.AsyncPacketMagic)
@@ -97,7 +89,7 @@ def AsynHPA0(clockRef):
     return packet_bytes
 
 
-def AsynHPD0():
+def asyn_hpd0():
     packet_bytes = b''
     packet_bytes += struct.pack('<I', 20)
     packet_bytes += struct.pack('<I', AyncConst.AsyncPacketMagic)
@@ -116,7 +108,7 @@ class AyncPacket:
 
     @classmethod
     def from_bytes(self, buffer):
-        _, clockRef = ParseAsynHeader(buffer, self.messageMagic)
+        _, clockRef = parse_asyn_header(buffer, self.messageMagic)
         return self(clockRef)
 
     def __str__(self):
@@ -132,7 +124,7 @@ class AsynCmSampleBufPacket(AyncPacket):
     @classmethod
     def from_bytes(self, buffer):
         magic = struct.unpack('<I', buffer[12:16])[0]
-        _, clockRef = ParseAsynHeader(buffer, magic)
+        _, clockRef = parse_asyn_header(buffer, magic)
 
         if magic == AyncConst.FEED:
             CMSampleBuf = CMSampleBuffer.from_bytesVideo(buffer[16:])
@@ -165,7 +157,7 @@ class AsynSprpPacket(AyncPacket):
 
     @classmethod
     def from_bytes(self, buffer):
-        remainingBytes, ClockRef = ParseAsynHeader(buffer, self.messageMagic)
+        remainingBytes, ClockRef = parse_asyn_header(buffer, self.messageMagic)
         Property = parse_key_value_dict(remainingBytes)
         return self(ClockRef, Property)
 
@@ -185,7 +177,7 @@ class AsynSratPacket(AyncPacket):
 
     @classmethod
     def from_bytes(self, buffer):
-        remainingBytes, ClockRef = ParseAsynHeader(buffer, self.messageMagic)
+        remainingBytes, ClockRef = parse_asyn_header(buffer, self.messageMagic)
         Rate1 = struct.unpack('f', remainingBytes[:4])[0]
         Rate2 = struct.unpack('f', remainingBytes[4:8])[0]
         Time = CMTime.from_buffer_copy(remainingBytes[8:])
@@ -205,7 +197,7 @@ class AsynTbasPacket(AyncPacket):
 
     @classmethod
     def from_bytes(self, buffer):
-        remainingBytes, ClockRef = ParseAsynHeader(buffer, self.messageMagic)
+        remainingBytes, ClockRef = parse_asyn_header(buffer, self.messageMagic)
         SomeOtherRef = struct.unpack('<Q', buffer[:8])[0]
         return self(ClockRef, SomeOtherRef)
 
@@ -223,7 +215,7 @@ class AsynTjmpPacket(AyncPacket):
 
     @classmethod
     def from_bytes(self, buffer):
-        Unknown, ClockRef = ParseAsynHeader(buffer, self.messageMagic)
+        Unknown, ClockRef = parse_asyn_header(buffer, self.messageMagic)
 
         return self(ClockRef, Unknown)
 

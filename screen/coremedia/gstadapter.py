@@ -1,28 +1,34 @@
 import logging
 
 import gi
+
+gi.require_version('Gst', '1.0')
+gi.require_version('GstBase', '1.0')
+gi.require_version('GstAudio', '1.0')
+gi.require_version('GstVideo', '1.0')
+
 from gi.repository import Gst, GObject, GLib
 
 
 def setup_live_playAudio(pipe):
-    autoaudiosink = Gst.ElementFactory.make("autoaudiosink", "autoaudiosink_01")
+    autoaudiosink = Gst.ElementFactory.make("autoaudiosink", "auto_audio_sink")
     autoaudiosink.set_property("sync", False)
     pipe.add(autoaudiosink)
-    pipe.get_by_name("queue2").link(autoaudiosink)
+    pipe.get_by_name("queue_audio_convert").link(autoaudiosink)
 
 
 def setup_video_pipeline(pipe):
     src = Gst.ElementFactory.make("appsrc", "my-video_src")
     src.set_property("is-live", True)
-    queue1 = Gst.ElementFactory.make("queue", "queue_11")
-    h264parse = Gst.ElementFactory.make("h264parse", "h264parse_01")
-    avdecH264 = Gst.ElementFactory.make("vtdec", "vtdec_01")
+    queue1 = Gst.ElementFactory.make("queue", "queue_h264parse")
+    h264parse = Gst.ElementFactory.make("h264parse", "h264_parse")
+    avdecH264 = Gst.ElementFactory.make("vtdec", "vt_dec")
 
-    queue2 = Gst.ElementFactory.make("queue", "queue_12")
-    videoconvert = Gst.ElementFactory.make("videoconvert", "videoconvert_01")
+    queue2 = Gst.ElementFactory.make("queue", "queue_video_convert")
+    videoconvert = Gst.ElementFactory.make("videoconvert", "video_convert")
 
-    queue3 = Gst.ElementFactory.make("queue", "queue_13")
-    sink = Gst.ElementFactory.make("autovideosink", "autovideosink_01")
+    queue3 = Gst.ElementFactory.make("queue", "queue_av")
+    sink = Gst.ElementFactory.make("autovideosink", "av_sink")
     sink.set_property("sync", False)
 
     pipe.add(src)
@@ -49,12 +55,12 @@ def setup_audio_pipeline(pipe):
     src = Gst.ElementFactory.make("appsrc", "my-audio-src")
     src.set_property("is-live", True)
 
-    queue1 = Gst.ElementFactory.make("queue", "queue1")
-    wavparse = Gst.ElementFactory.make("wavparse", "wavparse_01")
+    queue1 = Gst.ElementFactory.make("queue", "queue_wav_parse")
+    wavparse = Gst.ElementFactory.make("wavparse", "wav_parse")
     wavparse.set_property("ignore-length", True)
 
-    queue2 = Gst.ElementFactory.make("queue", "queue2")
-    audioconvert = Gst.ElementFactory.make("audioconvert", "audioconvert_01")
+    queue2 = Gst.ElementFactory.make("queue", "queue_audio_convert")
+    audioconvert = Gst.ElementFactory.make("audioconvert", "audio_convert")
 
     pipe.add(src)
     pipe.add(queue1)

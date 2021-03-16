@@ -5,12 +5,11 @@ import signal
 import struct
 import threading
 from time import sleep, time
-
 import usb
 from usb.core import Configuration
 
 from .coremedia.consumer import AVFileWriter, SocketUDP, GstAdapter
-from packet.meaasge import MessageProcessor
+from screen.meaasge import MessageProcessor
 
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s - %(filename)s[line:%(lineno)d] - %(levelname)s: %(message)s')
@@ -119,15 +118,15 @@ def register_signal(stopSignal):
         signal.signal(sig, shutdown)
 
 
-def record_wav(device, h264FilePath, wavFilePath, audioOnly):
-    consumer = AVFileWriter(h264FilePath=h264FilePath, wavFilePath=wavFilePath, audioOnly=audioOnly)
+def record_wav(device, h264FilePath, wavFilePath, audio_only=False):
+    consumer = AVFileWriter(h264FilePath=h264FilePath, wavFilePath=wavFilePath, audioOnly=audio_only)
     stopSignal = threading.Event()
     register_signal(stopSignal)
     start_reading(consumer, device, stopSignal)
 
 
-def send_udp(device, audioOnly):
-    consumer = SocketUDP(audioOnly=audioOnly)
+def record_udp(device, audio_only=False):
+    consumer = SocketUDP(audioOnly=audio_only)
     stopSignal = threading.Event()
     register_signal(stopSignal)
     start_reading(consumer, device, stopSignal)
@@ -198,13 +197,13 @@ def start_reading(consumer, device, stopSignal: threading.Event = None):
             lengthBuffer = byteStream.get(4)
             _length = struct.unpack('<I', lengthBuffer)[0] - 4
             buffer = byteStream.get(_length)
-            message.ReceiveData(buffer)
+            message.receive_data(buffer)
 
     _thread.start_new_thread(writeStream, ())
     _thread.start_new_thread(readStream, ())
 
     while not stopSignal.wait(1):
         pass
-    message.CloseSession()
+    message.close_session()
     disable_qt_config(device)
     consumer.stop()

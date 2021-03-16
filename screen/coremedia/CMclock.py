@@ -25,11 +25,11 @@ class CMClock:
             CMTimeEpoch=0)
 
     @classmethod
-    def new_clock(cls, id):
+    def new(cls, id):
         return cls(id, NanoSecondScale, time.time_ns(), 1)
 
     @classmethod
-    def new_clock_scale(cls, id, timeScale):
+    def new_scale(cls, id, timeScale):
         factor = float(timeScale) / float(NanoSecondScale)
         return cls(id, timeScale, time.time_ns(), factor)
 

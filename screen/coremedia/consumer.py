@@ -1,19 +1,19 @@
 """
-流输出
+最终流输出，需要继承 Consumer 类
 """
 
 import io
 import logging
 import os
-import struct
 import socket
+import struct
+
+from gi.repository import Gst
 
 from .CMFormatDescription import DescriptorConst
 from .CMSampleBuffer import CMSampleBuffer
 from .gstadapter import setup_video_pipeline, setup_audio_pipeline, setup_live_playAudio, run_main_loop
 from .wav import set_wav_header, get_wav_header
-from gi.repository import Gst, GObject, GLib
-import _thread
 
 startCode = b'\x00\x00\x00\x01'
 
@@ -27,9 +27,11 @@ class Consumer:
 
 
 class AVFileWriter(Consumer):
+    """ 保存 h264/wav 文件
+    """
     num = 0
 
-    def __init__(self, h264FilePath=None, wavFilePath=None, outFilePath=None, audioOnly=None):
+    def __init__(self, h264FilePath=None, wavFilePath=None, outFilePath=None, audioOnly=False):
         self.h264FilePath = h264FilePath
         self.wavFilePath = wavFilePath
         self.h264FileWriter: io.open = io.open(h264FilePath, 'wb+')
@@ -84,7 +86,7 @@ class SocketUDP(Consumer):
     :return:
     """
 
-    def __init__(self, broadcast=None, audioOnly=None):
+    def __init__(self, broadcast=None, audioOnly=False):
 
         self.socket_udp = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.socket_udp.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
@@ -156,35 +158,35 @@ class GstAdapter(Consumer):
         if data.MediaType == DescriptorConst.MediaTypeSound:
             if self.firstAudioSample:
                 self.firstAudioSample = False
-                self.sendWavHeader()
-            return self.sendAudioSample(data)
+                self.send_wav_header()
+            return self.send_audio_sample(data)
 
         if data.OutputPresentationTimestamp.CMTimeValue > 17446044073700192000:
             data.OutputPresentationTimestamp.CMTimeValue = 0
 
         if data.HasFormatDescription:
             data.OutputPresentationTimestamp.CMTimeValue = 0
-            self.writeNalu(startCode + data.FormatDescription.PPS, data)
-            self.writeNalu(startCode + data.FormatDescription.SPS, data)
-        self.writeNalus(data)
+            self.write_app_src(startCode + data.FormatDescription.PPS, data)
+            self.write_app_src(startCode + data.FormatDescription.SPS, data)
+        self.write_buffers(data)
 
-    def writeNalus(self, data: CMSampleBuffer):
+    def write_buffers(self, data: CMSampleBuffer):
         buf = data.SampleData
         if buf:
             while len(buf) > 0:
                 _length = struct.unpack('>I', buf[:4])[0]
-                self.writeNalu(startCode + buf[4:_length + 4], data)
+                self.write_app_src(startCode + buf[4:_length + 4], data)
                 buf = buf[_length + 4:]
         return True
 
-    def writeNalu(self, buf, data: CMSampleBuffer):
+    def write_app_src(self, buf, data: CMSampleBuffer):
         gstBuf = Gst.Buffer.new_allocate(None, len(buf), None)
         gstBuf.pts = data.OutputPresentationTimestamp.CMTimeValue
         gstBuf.dts = 0
         gstBuf.fill(0, buf)
         self.videoAppSrc.emit('push-buffer', gstBuf)
 
-    def sendWavHeader(self):
+    def send_wav_header(self):
         wav_header = get_wav_header(100)
         gstBuf = Gst.Buffer.new_allocate(None, len(wav_header), None)
         gstBuf.pts = 0
@@ -192,7 +194,7 @@ class GstAdapter(Consumer):
         gstBuf.fill(0, wav_header)
         self.audioAppSrc.emit('push-buffer', gstBuf)
 
-    def sendAudioSample(self, data: CMSampleBuffer):
+    def send_audio_sample(self, data: CMSampleBuffer):
         gstBuf = Gst.Buffer.new_allocate(None, len(data.SampleData), None)
         gstBuf.pts = data.OutputPresentationTimestamp.CMTimeValue
         gstBuf.dts = 0

@@ -33,20 +33,20 @@ class FormatDescriptor:
         self.AudioStreamBasicDescription: AudioStreamBasicDescription = AudioStream
 
     @classmethod
-    def from_bytes(self, buf):
+    def from_bytes(cls, buf):
         _, remainingBytes = parse_length_magic(buf, DescriptorConst.FormatDescriptorMagic)
-        mediaType, remainingBytes = parseMediaType(remainingBytes)
+        mediaType, remainingBytes = parse_media_type(remainingBytes)
         if mediaType == DescriptorConst.MediaTypeSound:
             length, _, = parse_length_magic(remainingBytes, DescriptorConst.AudioStreamBasicDescriptionMagic)
             AudioStream = AudioStreamBasicDescription.from_buffer_copy(remainingBytes[8:length])
-            return self(MediaType=DescriptorConst.MediaTypeSound, AudioStream=AudioStream)
+            return cls(MediaType=DescriptorConst.MediaTypeSound, AudioStream=AudioStream)
         else:
-            videoDimensionWidth, videoDimensionHeight, remainingBytes = parseVideoDimension(remainingBytes)
-            codec, remainingBytes = parseCodec(remainingBytes)
+            videoDimensionWidth, videoDimensionHeight, remainingBytes = parse_video_dimension(remainingBytes)
+            codec, remainingBytes = parse_codec(remainingBytes)
             Extensions = new_dictionary_from_bytes(remainingBytes, DescriptorConst.ExtensionMagic)
             pps, sps = extract_pps(Extensions)
-            return self(MediaType=DescriptorConst.MediaTypeVideo, Extensions=Extensions, PPS=pps, SPS=sps, Codec=codec,
-                        VideoDimensionHeight=videoDimensionHeight, VideoDimensionWidth=videoDimensionWidth)
+            return cls(MediaType=DescriptorConst.MediaTypeVideo, Extensions=Extensions, PPS=pps, SPS=sps, Codec=codec,
+                       VideoDimensionHeight=videoDimensionHeight, VideoDimensionWidth=videoDimensionWidth)
 
     def __str__(self):
         if self.MediaType == DescriptorConst.MediaTypeVideo:
@@ -55,19 +55,19 @@ class FormatDescriptor:
         return f'FormatDescriptor >> MediaType:{self.MediaType}, AudioStreamBasicDescription: {self.AudioStreamBasicDescription} '
 
 
-def parseMediaType(buf):
+def parse_media_type(buf):
     length, _, = parse_length_magic(buf, DescriptorConst.MediaTypeMagic)
     mediaType = struct.unpack('<I', buf[8:12])[0]
     return mediaType, buf[length:]
 
 
-def parseCodec(buf):
+def parse_codec(buf):
     length, _ = parse_length_magic(buf, DescriptorConst.CodecMagic)
     codec = struct.unpack('<I', buf[8:12])[0]
     return codec, buf[length:]
 
 
-def parseVideoDimension(buf):
+def parse_video_dimension(buf):
     length, _ = parse_length_magic(buf, DescriptorConst.VideoDimensionMagic)
     width = struct.unpack('<I', buf[8:12])[0]
     height = struct.unpack('<I', buf[12:16])[0]
