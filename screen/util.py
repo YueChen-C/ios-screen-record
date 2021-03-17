@@ -70,7 +70,8 @@ def enable_qt_config(device):
         try:
             device = find_ios_device(device.serial_number)
             break
-        except:
+        except Exception as E:
+            logging.error(E)
             pass
     return device
 
@@ -132,10 +133,10 @@ def record_udp(device, audio_only=False):
     start_reading(consumer, device, stopSignal)
 
 
-def record_gstAdapter(device):
+def record_gstreamer(device):
     stopSignal = threading.Event()
     register_signal(stopSignal)
-    consumer = GstAdapter.new()
+    consumer = GstAdapter.new(stopSignal)
     _thread.start_new_thread(start_reading, (consumer, device, stopSignal,))
     consumer.loop.run()
 
@@ -179,7 +180,7 @@ def start_reading(consumer, device, stopSignal: threading.Event = None):
         """
         while True:
             try:
-                data = device.read(inEndpoint, 1024 * 1024, 5000)
+                data = device.read(inEndpoint, 1024 * 1024, 3000)
                 sleep(0.01)
                 byteStream.put(data)
             except Exception as E:
@@ -207,3 +208,4 @@ def start_reading(consumer, device, stopSignal: threading.Event = None):
     message.close_session()
     disable_qt_config(device)
     consumer.stop()
+

@@ -21,11 +21,11 @@ def cmd_record_udp(args: argparse.Namespace):
     start_reading(consumer, device, stopSignal)
 
 
-def cmd_record_gstAdapter(args: argparse.Namespace):
+def cmd_record_gstreamer(args: argparse.Namespace):
     device = find_ios_device(args.udid)
     stopSignal = threading.Event()
     register_signal(stopSignal)
-    consumer = GstAdapter.new()
+    consumer = GstAdapter.new(stopSignal)
     _thread.start_new_thread(start_reading, (consumer, device, stopSignal,))
     consumer.loop.run()
 
@@ -34,9 +34,9 @@ def main():
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers(dest='subparser')
     parser.add_argument("-u", "--udid", help="specify unique device identifier")
-    gstadapter_parser = subparsers.add_parser("gstadapter",
+    gstreamer_parser = subparsers.add_parser("gstreamer",
                                               help="record will open a new window and push AV data to gstreamer.")
-    gstadapter_parser.set_defaults(func=cmd_record_gstAdapter)
+    gstreamer_parser.set_defaults(func=cmd_record_gstreamer)
 
     udp_parser = subparsers.add_parser("udp",
                                        help="forward H264 data to UDP broadcast. You can use VLC to play the URL")

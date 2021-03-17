@@ -7,12 +7,17 @@ import logging
 import os
 import socket
 import struct
+import gi
+gi.require_version('Gst', '1.0')
+gi.require_version('GstBase', '1.0')
+gi.require_version('GstAudio', '1.0')
+gi.require_version('GstVideo', '1.0')
 
 from gi.repository import Gst
 
 from .CMFormatDescription import DescriptorConst
 from .CMSampleBuffer import CMSampleBuffer
-from .gstadapter import setup_video_pipeline, setup_audio_pipeline, setup_live_playAudio, run_main_loop
+from .gstreamer import setup_video_pipeline, setup_audio_pipeline, setup_live_playAudio, run_main_loop
 from .wav import set_wav_header, get_wav_header
 
 startCode = b'\x00\x00\x00\x01'
@@ -133,15 +138,16 @@ class GstAdapter(Consumer):
     MP3 = "mp3"
     OGG = "ogg"
 
-    def __init__(self, videoAppSrc, audioAppSrc, firstAudioSample, loop=None,pipeline=None):
+    def __init__(self, videoAppSrc, audioAppSrc, firstAudioSample, loop=None, pipeline=None,stopSignal=None):
         self.videoAppSrc = videoAppSrc
         self.audioAppSrc = audioAppSrc
         self.firstAudioSample = firstAudioSample
         self.pipeline = pipeline
         self.loop = loop
+        self.stopSignal = stopSignal
 
     @classmethod
-    def new(cls):
+    def new(cls, stopSignal):
         Gst.init(None)
         logging.info("Starting Gstreamer..")
         pipe = Gst.Pipeline.new("QT_Hack_Pipeline")
@@ -149,10 +155,10 @@ class GstAdapter(Consumer):
         audioAppSrc = setup_audio_pipeline(pipe)
         setup_live_playAudio(pipe)
         pipe.set_state(Gst.State.PLAYING)
-        loop = run_main_loop(pipe)
+        loop = run_main_loop(pipe,stopSignal)
         # _thread.start_new_thread(run_main_loop, (pipe,))
         logging.info("Gstreamer is running!")
-        return cls(videoAppSrc, audioAppSrc, True,loop)
+        return cls(videoAppSrc, audioAppSrc, True, loop)
 
     def consume(self, data: CMSampleBuffer):
         if data.MediaType == DescriptorConst.MediaTypeSound:

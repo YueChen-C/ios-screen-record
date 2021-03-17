@@ -27,6 +27,6 @@ $ main.py --udid=xxxx udp
 $ main.py --udid=xxxx record -h264File=/home/out.h264  -wavFile=/home/out.wav
 
 # gstadapter 渲染显示画面
-$ main.py --udid=xxxx gstadapter
+$ main.py --udid=xxxx gstreamer
 ```
 

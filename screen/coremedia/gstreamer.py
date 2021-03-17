@@ -1,4 +1,5 @@
 import logging
+from time import sleep
 
 import gi
 
@@ -75,16 +76,18 @@ def setup_audio_pipeline(pipe):
     return src
 
 
-def run_main_loop(pipeline):
+def run_main_loop(pipeline,stopSignal):
     def bus_call(bus, message, loop):
         t = message.type
         Gst.debug_bin_to_dot_file_with_ts(pipeline, Gst.DebugGraphDetails.ALL, "test")
         if t == Gst.MessageType.EOS:
-            logging.info("End-of-stream\n")
+            logging.info("End-of-stream")
             loop.quit()
         elif t == Gst.MessageType.ERROR:
             err, debug = message.parse_error()
-            logging.info("Error: %s: %s\n" % (err, debug))
+            logging.error(f" {err}: {debug}")
+            stopSignal.set()
+            sleep(2)
             loop.quit()
         return True
     loop = GLib.MainLoop()
