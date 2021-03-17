@@ -63,6 +63,7 @@ def enable_qt_config(device):
     :param device:
     :return:
     """
+    logging.info('Enabling hidden QT config')
     val = device.ctrl_transfer(0x40, 0x52, 0, 2, b'')
     if val:
         raise Exception(f'Enable QTConfig Error {val} ')
@@ -81,7 +82,7 @@ def disable_qt_config(device):
     :param device:
     :return:
     """
-    logging.info('Enabling hidden QT config')
+    logging.info('Disabling hidden QT config')
     val = device.ctrl_transfer(0x40, 0x52, 0, 0, b'')
     if val:
         logging.warning('Failed sending control transfer for enabling hidden QT config')
@@ -94,20 +95,17 @@ class ByteStream:
         self._byte = bytearray()
 
     def put(self, _byte: array):
-        # self.mutex.acquire()
         self._byte.extend(_byte)
-        # self.mutex.release()
         return True
 
     def get(self, num: int, timeout=5):
         t1 = time()
         while num > len(self._byte):
+            sleep(0.01)
             if timeout < t1 - time():
                 break
-        # self.mutex.acquire()
         _byte = self._byte[:num]
         self._byte = self._byte[num:]
-        # self.mutex.release()
         return _byte
 
 
@@ -181,7 +179,6 @@ def start_reading(consumer, device, stopSignal: threading.Event = None):
         while True:
             try:
                 data = device.read(inEndpoint, 1024 * 1024, 3000)
-                sleep(0.01)
                 byteStream.put(data)
             except Exception as E:
                 logging.warning(E)

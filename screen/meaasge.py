@@ -25,14 +25,14 @@ class MessageProcessor:
     lastEatFrameReceivedLocalAudioClockTime = None
     releaseWaiter = threading.Event()  # 主动结束回调
 
-    def __init__(self, device, inEndpoint, outEndpoint, stopSignal, cmSampleBufConsumer):
+    def __init__(self, device, inEndpoint, outEndpoint, stopSignal, cmSampleBufConsumer: Consumer):
         self.device = device
-        self.inEndpoint = inEndpoint
-        self.outEndpoint = outEndpoint
-        self.stopSignal = stopSignal
+        self.inEndpoint = inEndpoint  # 输出数据端口
+        self.outEndpoint = outEndpoint  # 写入数据端口
+        self.stopSignal = stopSignal  # 停止标识
         self.localAudioClock = None
         self.deviceAudioClockRef = None
-        self.cmSampleBufConsumer: Consumer = cmSampleBufConsumer
+        self.cmSampleBufConsumer: Consumer = cmSampleBufConsumer  # 处理输出数据
 
     def usbWrite(self, data):
         # print('写入:',data)
