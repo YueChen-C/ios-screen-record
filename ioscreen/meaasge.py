@@ -3,11 +3,11 @@ import struct
 import threading
 
 from .coremedia.consumer import Consumer
-from screen.asyn import AyncConst, create_hpd1_device, new_asyn_dict_packet, create_hpa1_device, \
+from .asyn import AyncConst, create_hpd1_device, new_asyn_dict_packet, create_hpa1_device, \
     asyn_need_packet_bytes, AsynCmSampleBufPacket, AsynSprpPacket, AsynTjmpPacket, AsynSratPacket, AsynTbasPacket, \
     AsynRelsPacket, asyn_hpa0, asyn_hpd0
-from screen.coremedia.CMclock import CMClock, calculate_skew
-from screen.ping import PingConst, new_ping_packet_bytes
+from .coremedia.CMclock import CMClock, calculate_skew
+from .ping import PingConst, new_ping_packet_bytes
 from .sync import SyncConst, SyncOGPacket, SyncCwpaPacket, clock_ref_reply, SyncCvrpPacket, SyncClockPacket, \
     SyncTimePacket, SyncAfmtPacket, SyncSkewPacket, SyncStopPacket
 
@@ -101,7 +101,7 @@ class MessageProcessor:
             self.usbWrite(replyBytes)
 
         else:
-            logging.warning("received unknown sync screen type: %x", buffer)
+            logging.warning("received unknown sync ioscreen type: %x", buffer)
 
     def handleAsyncPacket(self, buffer: bytes):
         code = struct.unpack('<I', buffer[12:16])[0]
@@ -152,7 +152,7 @@ class MessageProcessor:
         elif code == AyncConst.AsyncPacketMagic:
             self.handleAsyncPacket(buffer)
         else:
-            logging.warning(f'received unknown screen {buffer}')
+            logging.warning(f'received unknown ioscreen {buffer}')
 
     def close_session(self):
         # 如非正常关闭有可能会造成设备无法访问，需要重插 usb 或重启设备

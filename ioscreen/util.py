@@ -3,13 +3,14 @@ import array
 import logging
 import signal
 import struct
+import sys
 import threading
 from time import sleep, time
 import usb
 from usb.core import Configuration
 
 from .coremedia.consumer import AVFileWriter, SocketUDP, GstAdapter
-from screen.meaasge import MessageProcessor
+from .meaasge import MessageProcessor
 
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s - %(filename)s[line:%(lineno)d] - %(levelname)s: %(message)s')
@@ -46,7 +47,11 @@ def find_ios_device(udid=None):
     devices = usb.core.find(find_all=True, custom_match=find_class(0xfe))
     _device = None
     if not udid:
-        _device = next(devices)
+        try:
+            _device = next(devices)
+        except StopIteration:
+            logging.warning('未找到 iOS 连接设备')
+            sys.exit()
     else:
         for device in devices:
             if udid in device.serial_number:
@@ -58,7 +63,7 @@ def find_ios_device(udid=None):
     return _device
 
 
-def enable_qt_config(device):
+def enable_qt_config(device,stopSignal):
     """ 开启 qt 配置选项
     :param device:
     :return:
@@ -67,13 +72,14 @@ def enable_qt_config(device):
     val = device.ctrl_transfer(0x40, 0x52, 0, 2, b'')
     if val:
         raise Exception(f'Enable QTConfig Error {val} ')
-    while 5:
+    for _ in range(5):
         try:
             device = find_ios_device(device.serial_number)
             break
         except Exception as E:
             logging.error(E)
-            pass
+    else:
+        stopSignal.set()
     return device
 
 
@@ -144,7 +150,7 @@ def start_reading(consumer, device, stopSignal: threading.Event = None):
     disable_qt_config(device)
     device.set_configuration()
     logging.info("enable_qt_config..")
-    device = enable_qt_config(device)
+    device = enable_qt_config(device,stopSignal)
     config_index = 0
     qt_config = None
     for i in range(device.bNumConfigurations):
@@ -205,4 +211,3 @@ def start_reading(consumer, device, stopSignal: threading.Event = None):
     message.close_session()
     disable_qt_config(device)
     consumer.stop()
-

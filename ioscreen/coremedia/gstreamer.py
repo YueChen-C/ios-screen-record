@@ -78,6 +78,8 @@ def setup_audio_pipeline(pipe):
 
 def run_main_loop(pipeline,stopSignal):
     def bus_call(bus, message, loop):
+        if stopSignal.isSet():
+            loop.quit()
         t = message.type
         Gst.debug_bin_to_dot_file_with_ts(pipeline, Gst.DebugGraphDetails.ALL, "test")
         if t == Gst.MessageType.EOS:

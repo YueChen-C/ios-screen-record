@@ -124,7 +124,7 @@ def parse_key_value_dict(data):
 
 
 def parse_value(buf):
-    from screen.coremedia.CMFormatDescription import DescriptorConst, FormatDescriptor
+    from ioscreen.coremedia.CMFormatDescription import DescriptorConst, FormatDescriptor
 
     valueLength = struct.unpack('<I', buf[:4])[0]
     magic = struct.unpack('<I', buf[4:8])[0]

@@ -11,9 +11,11 @@
 
 
 ####  Mac OSX 安装
+python >=3.7
+
 1. `brew install libusb pkg-config`
 2. 如需使用 gstreamer 则需要安装 `brew install gstreamer gst-plugins-bad gst-plugins-good gst-plugins-base gst-plugins-ugly`
-2. `python install -r requirements.txt`
+2. `pip install ioscreen`
 
 
 
@@ -21,12 +23,12 @@
 ```bash
 # vlc 工具播放udp地址： udp/h264://@:8880
 # 转发 h264 udp 广播  
-$ main.py --udid=xxxx udp
+$ ioscreen --udid=xxxx udp
 
 # 录制 h264/wav 文件
-$ main.py --udid=xxxx record -h264File=/home/out.h264  -wavFile=/home/out.wav
+$ ioscreen --udid=xxxx record -h264File=/home/out.h264  -wavFile=/home/out.wav
 
-# gstadapter 渲染显示画面
-$ main.py --udid=xxxx gstreamer
+# gstreamer 渲染显示画面
+$ ioscreen --udid=xxxx gstreamer
 ```
 

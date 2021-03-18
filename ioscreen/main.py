@@ -2,7 +2,7 @@ import _thread
 import argparse
 
 
-from screen.util import *
+from ioscreen.util import *
 
 
 def cmd_record_wav(args: argparse.Namespace):
