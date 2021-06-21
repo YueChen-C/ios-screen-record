@@ -7,9 +7,9 @@ import sys
 import threading
 from time import sleep, time
 import usb
-from usb.core import Configuration
+from usb.core import Configuration, Device
 
-from .coremedia.consumer import AVFileWriter, SocketUDP, GstAdapter
+from .coremedia.consumer import AVFileWriter, SocketUDP, Consumer
 from .meaasge import MessageProcessor
 
 logging.basicConfig(level=logging.INFO,
@@ -138,6 +138,7 @@ def record_udp(device, audio_only=False):
 
 
 def record_gstreamer(device):
+    from .coremedia.gstreamer import GstAdapter
     stopSignal = threading.Event()
     register_signal(stopSignal)
     consumer = GstAdapter.new(stopSignal)
@@ -145,7 +146,7 @@ def record_gstreamer(device):
     consumer.loop.run()
 
 
-def start_reading(consumer, device, stopSignal: threading.Event = None):
+def start_reading(consumer:Consumer, device:Device, stopSignal: threading.Event = None):
     stopSignal = stopSignal or threading.Event()
     disable_qt_config(device)
     device.set_configuration()

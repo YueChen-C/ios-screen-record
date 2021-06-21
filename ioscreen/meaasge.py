@@ -43,10 +43,12 @@ class MessageProcessor:
         code = struct.unpack('<I', buffer[12:16])[0]
         if code == SyncConst.OG:
             ogPacket = SyncOGPacket.from_bytes(buffer)
+            logging.debug(ogPacket)
             self.usbWrite(ogPacket.to_bytes())
 
         elif code == SyncConst.CWPA:
             cwpaPacket = SyncCwpaPacket.from_bytes(buffer)
+            logging.debug(cwpaPacket)
             clockRef = cwpaPacket.DeviceClockRef + 1000
             self.localAudioClock = CMClock.new(clockRef)
             self.deviceAudioClockRef = cwpaPacket.DeviceClockRef
@@ -64,14 +66,17 @@ class MessageProcessor:
 
         elif code == SyncConst.CVRP:
             cvrpPacket = SyncCvrpPacket.from_bytes(buffer)
+            logging.debug(cvrpPacket)
             self.needClockRef = cvrpPacket.DeviceClockRef
             self.needMessage = asyn_need_packet_bytes(cvrpPacket.DeviceClockRef)
+            logging.debug(f"Sending needMessage")
             self.usbWrite(self.needMessage)
             clockRef2 = cvrpPacket.DeviceClockRef + 0x1000AF
             self.usbWrite(clock_ref_reply(clockRef2, cvrpPacket.CorrelationID))
 
         elif code == SyncConst.CLOK:
             clockPacket = SyncClockPacket.from_bytes(buffer)
+            logging.debug(clockPacket)
             clockRef = clockPacket.ClockRef + 0x10000
             self.clock = CMClock.new(clockRef)  # 本地时钟用来同步时间差
             replyBytes = clock_ref_reply(clockRef, clockPacket.CorrelationID)
@@ -79,24 +84,28 @@ class MessageProcessor:
 
         elif code == SyncConst.TIME:
             timePacket = SyncTimePacket.from_bytes(buffer)
+            logging.debug(timePacket)
             timeToSend = self.clock.getTime()
             replyBytes = timePacket.to_bytes(timeToSend)
             self.usbWrite(replyBytes)
 
         elif code == SyncConst.AFMT:
             afmtPacket = SyncAfmtPacket.from_bytes(buffer)
+            logging.debug(afmtPacket)
             replyBytes = afmtPacket.to_bytes()
             self.usbWrite(replyBytes)
 
         elif code == SyncConst.SKEW:
-            afmtPacket = SyncSkewPacket.from_bytes(buffer)
+            skewPacket = SyncSkewPacket.from_bytes(buffer)
+            logging.debug(skewPacket)
             skewValue = calculate_skew(self.startTimeLocalAudioClock, self.lastEatFrameReceivedLocalAudioClockTime,
                                        self.startTimeDeviceAudioClock, self.lastEatFrameReceivedDeviceAudioClockTime)
-            replyBytes = afmtPacket.to_bytes(skewValue)
+            replyBytes = skewPacket.to_bytes(skewValue)
             self.usbWrite(replyBytes)
 
         elif code == SyncConst.STOP:
             stopPacket = SyncStopPacket.from_bytes(buffer)
+            logging.debug(stopPacket)
             replyBytes = stopPacket.to_bytes()
             self.usbWrite(replyBytes)
 

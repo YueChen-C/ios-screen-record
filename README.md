@@ -22,7 +22,7 @@ python >=3.7
 #### 使用 
 ```bash
 # vlc 工具播放udp地址： udp/h264://@:8880
-# 转发 h264 udp 广播  
+# 转发 h264 udp 广播，Mac 本身限制了 udp 发送，延迟会越来越大（仅测试使用）
 $ ioscreen --udid=xxxx udp
 
 # 录制 h264/wav 文件
@@ -31,4 +31,6 @@ $ ioscreen --udid=xxxx record -h264File=/home/out.h264  -wavFile=/home/out.wav
 # gstreamer 渲染显示画面
 $ ioscreen --udid=xxxx gstreamer
 ```
+
+QQ 交流群：37042417
 

@@ -42,10 +42,7 @@ def create_hpd1_device():
 
 
 def create_hpa1_device():
-    AudioBytes = AudioStreamBasicDescription(FormatFlags=12,
-                                             BytesPerPacket=4, FramesPerPacket=1, BytesPerFrame=4, ChannelsPerFrame=2,
-                                             BitsPerChannel=16, Reserved=0,
-                                             SampleRate=48000, FormatID=AudioFormatIDLMagic).to_bytes()
+    AudioBytes = AudioStreamBasicDescription.new().to_bytes()
 
     resultDict = {
         'BufferAheadInterval': NSNumber(6, 0.07300000000000001),

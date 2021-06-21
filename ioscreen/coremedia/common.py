@@ -11,7 +11,7 @@ class NSNumber:
         self.value = value
 
     @classmethod
-    def from_bytes(self, buf):
+    def from_bytes(cls, buf):
         typeSpecifier = buf[0]
         if typeSpecifier == 3:
             value = struct.unpack('<I', buf[1:])[0]
@@ -23,7 +23,7 @@ class NSNumber:
             value = struct.unpack('<d', buf[1:])[0]
         else:
             raise Exception('not find value')
-        return self(typeSpecifier, value)
+        return cls(typeSpecifier, value)
 
     def to_bytes(self):
         buf = b''

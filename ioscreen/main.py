@@ -1,7 +1,6 @@
 import _thread
 import argparse
 
-
 from ioscreen.util import *
 
 
@@ -22,6 +21,7 @@ def cmd_record_udp(args: argparse.Namespace):
 
 
 def cmd_record_gstreamer(args: argparse.Namespace):
+    from ioscreen.coremedia.gstreamer import GstAdapter
     device = find_ios_device(args.udid)
     stopSignal = threading.Event()
     register_signal(stopSignal)
