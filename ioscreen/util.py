@@ -119,7 +119,7 @@ def register_signal(stopSignal):
     def shutdown(num, frame):
         stopSignal.set()
 
-    for sig in [signal.SIGINT, signal.SIGHUP, signal.SIGTERM]:
+    for sig in [signal.SIGINT, signal.SIGTERM]:
         signal.signal(sig, shutdown)
 
 
@@ -160,6 +160,7 @@ def start_reading(consumer, device, stopSignal: threading.Event = None):
             config_index = i + 1
             break
     device.set_configuration(config_index)
+    device.set_interface_altsetting(2) # 将接口设置到 2 上
     device.ctrl_transfer(0x02, 0x01, 0, 0x86, b'')
     device.ctrl_transfer(0x02, 0x01, 0, 0x05, b'')
     if not qt_config:
@@ -184,7 +185,8 @@ def start_reading(consumer, device, stopSignal: threading.Event = None):
         """
         while True:
             try:
-                data = device.read(inEndpoint, 1024 * 1024, 3000)
+                data = device.read(inEndpoint, 1024 * 1024, 30000)
+                print("接收：",data)
                 byteStream.put(data)
             except Exception as E:
                 logging.warning(E)

@@ -7,17 +7,9 @@ import logging
 import os
 import socket
 import struct
-import gi
-gi.require_version('Gst', '1.0')
-gi.require_version('GstBase', '1.0')
-gi.require_version('GstAudio', '1.0')
-gi.require_version('GstVideo', '1.0')
-
-from gi.repository import Gst
 
 from .CMFormatDescription import DescriptorConst
 from .CMSampleBuffer import CMSampleBuffer
-from .gstreamer import setup_video_pipeline, setup_audio_pipeline, setup_live_playAudio, run_main_loop
 from .wav import set_wav_header, get_wav_header
 
 startCode = b'\x00\x00\x00\x01'
@@ -148,6 +140,15 @@ class GstAdapter(Consumer):
 
     @classmethod
     def new(cls, stopSignal):
+        import gi
+        gi.require_version('Gst', '1.0')
+        gi.require_version('GstBase', '1.0')
+        gi.require_version('GstAudio', '1.0')
+        gi.require_version('GstVideo', '1.0')
+
+        from gi.repository import Gst
+        from .gstreamer import setup_video_pipeline, setup_audio_pipeline, setup_live_playAudio, run_main_loop
+
         Gst.init(None)
         logging.info("Starting Gstreamer..")
         pipe = Gst.Pipeline.new("QT_Hack_Pipeline")

@@ -35,7 +35,7 @@ class MessageProcessor:
         self.cmSampleBufConsumer: Consumer = cmSampleBufConsumer  # 处理输出数据
 
     def usbWrite(self, data):
-        # print('写入:',data)
+        print('写入:',data)
         self.device.write(self.outEndpoint, data, 100)
 
     def handleSyncPacket(self, buffer: bytes):
@@ -145,6 +145,7 @@ class MessageProcessor:
     def receive_data(self, buffer):
         code = struct.unpack('<I', buffer[:4])[0]
         if code == PingConst.PingPacketMagic:
+            logging.info("接收到 PING")
             logging.info("AudioVideo-Stream has start success")
             self.usbWrite(new_ping_packet_bytes())
         elif code == SyncConst.SyncPacketMagic:
