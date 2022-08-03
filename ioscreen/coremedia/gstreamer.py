@@ -13,6 +13,8 @@ gi.require_version('GstVideo', '1.0')
 from .consumer import startCode, Consumer
 from gi.repository import Gst, GObject, GLib
 
+GST_PLUGIN_PATH = '/usr/local/lib/gstreamer-1.0'
+
 
 
 def setup_live_playAudio(pipe):
@@ -122,6 +124,17 @@ class GstAdapter(Consumer):
     def new(cls, stopSignal):
         Gst.init(None)
         logging.info("Starting Gstreamer..")
+
+        # fix Gst plugin path issue in brew:
+        # https://gstreamer.freedesktop.org/documentation/gstreamer/gstregistry.html?gi-language=python#GstRegistry
+        # default locations are: $XDG_DATA_HOME/gstreamer-$GST_API_VERSION/plugins/ and $prefix/libs
+        # brew gstream installation $prefix=/usr/local/Cellar/gstreamer/1.20.3/lib
+        # and installed plugins in /usr/local/lib/gstreamer-1.0
+        registry = Gst.Registry.get()
+        if not registry.find_plugin('app'):
+            logging.warning("Gstreamer plugin not loaded... scan for %s", GST_PLUGIN_PATH)
+            registry.scan_path(GST_PLUGIN_PATH)
+
         pipe = Gst.Pipeline.new("QT_Hack_Pipeline")
         videoAppSrc = setup_video_pipeline(pipe)
         audioAppSrc = setup_audio_pipeline(pipe)
