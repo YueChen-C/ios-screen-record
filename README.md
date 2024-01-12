@@ -9,6 +9,8 @@
 - 支持多设备并行
 
 
+window 支持并查看 window 分支 查看文档:[windows.md](windows.md)
+
 
 ####  Mac OSX 安装
 python >=3.7
