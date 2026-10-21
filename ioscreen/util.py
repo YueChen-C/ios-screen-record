@@ -1,12 +1,14 @@
 import _thread
 import array
 import logging
+import os
 import signal
 import struct
 import sys
 import threading
 from time import sleep, time
 import usb
+import usb.backend.libusb1
 from usb.core import Configuration, Device
 
 from .coremedia.consumer import AVFileWriter, SocketUDP, Consumer
@@ -14,6 +16,24 @@ from .meaasge import MessageProcessor
 
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s - %(filename)s[line:%(lineno)d] - %(levelname)s: %(message)s')
+
+
+def _get_usb_backend():
+    """Load the bundled libusb on macOS, where PyUSB cannot locate it by name."""
+    if sys.platform == 'darwin':
+        libusb_path = os.path.join(os.path.dirname(__file__), 'libusb-1.0.0.dylib')
+        if os.path.isfile(libusb_path):
+            backend = usb.backend.libusb1.get_backend(
+                find_library=lambda _name: libusb_path
+            )
+            if backend is None:
+                raise RuntimeError(f'Unable to load bundled libusb backend: {libusb_path}')
+            return backend
+
+    backend = usb.backend.libusb1.get_backend()
+    if backend is None:
+        raise RuntimeError('Unable to load libusb backend; install libusb and verify its architecture')
+    return backend
 
 
 class iOSDevice:
@@ -44,7 +64,11 @@ def find_ios_device(udid=None):
                     return True
             return False
 
-    devices = usb.core.find(find_all=True, custom_match=find_class(0xfe))
+    devices = usb.core.find(
+        find_all=True,
+        custom_match=find_class(0xfe),
+        backend=_get_usb_backend(),
+    )
     _device = None
     if not udid:
         try:
@@ -138,12 +162,12 @@ def record_udp(device, audio_only=False):
 
 
 def record_gstreamer(device):
-    from .coremedia.gstreamer import GstAdapter
+    from .coremedia.gstreamer import GstAdapter, run_consumer_loop
     stopSignal = threading.Event()
     register_signal(stopSignal)
     consumer = GstAdapter.new(stopSignal)
     _thread.start_new_thread(start_reading, (consumer, device, stopSignal,))
-    consumer.loop.run()
+    run_consumer_loop(consumer)
 
 
 def start_reading(consumer:Consumer, device:Device, stopSignal: threading.Event = None):

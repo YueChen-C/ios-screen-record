@@ -21,13 +21,13 @@ def cmd_record_udp(args: argparse.Namespace):
 
 
 def cmd_record_gstreamer(args: argparse.Namespace):
-    from ioscreen.coremedia.gstreamer import GstAdapter
+    from ioscreen.coremedia.gstreamer import GstAdapter, run_consumer_loop
     device = find_ios_device(args.udid)
     stopSignal = threading.Event()
     register_signal(stopSignal)
     consumer = GstAdapter.new(stopSignal)
     _thread.start_new_thread(start_reading, (consumer, device, stopSignal,))
-    consumer.loop.run()
+    run_consumer_loop(consumer)
 
 
 def main():

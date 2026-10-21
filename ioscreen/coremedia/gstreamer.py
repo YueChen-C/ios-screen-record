@@ -1,6 +1,7 @@
 from time import sleep
 import logging
 import struct
+import sys
 from .CMFormatDescription import DescriptorConst
 from .CMSampleBuffer import CMSampleBuffer
 from .wav import get_wav_header
@@ -14,6 +15,91 @@ from .consumer import startCode, Consumer
 from gi.repository import Gst, GObject, GLib
 
 GST_PLUGIN_PATH = '/usr/local/lib/gstreamer-1.0'
+
+
+def ensure_macos_nsapplication():
+    """GStreamer video sinks (glimagesink/osxvideosink) can only create their
+    window when [NSApplication sharedApplication] exists on the main thread;
+    otherwise the pipeline plays silently with no window. See the warning:
+    "An NSApplication needs to be running on the main thread ...".
+
+    The process also runs as a background (non-bundle) app by default, so
+    macOS may place the video window on another display or behind other apps;
+    activate it so the window shows up front on the current display.
+    """
+    if sys.platform != 'darwin':
+        return
+    try:
+        import objc
+        objc.loadBundle('AppKit', {}, bundle_path='/System/Library/Frameworks/AppKit.framework')
+        app = objc.lookUpClass('NSApplication').sharedApplication()
+        # NSApplicationActivationPolicyAccessory = 1 (activatable, no Dock icon)
+        app.setActivationPolicy_(1)
+        app.activateIgnoringOtherApps_(True)
+    except Exception as e:
+        logging.warning("Unable to initialize NSApplication, video window may not show: %s", e)
+
+
+def focus_macos_video_window():
+    """Bring the GStreamer video window to front and center it on its display.
+    Called repeatedly on the GLib main loop until the window exists and is
+    focused (the window is created lazily when the first video frame arrives)."""
+    focus_macos_video_window.tries += 1
+    try:
+        import objc
+        app = objc.lookUpClass('NSApplication').sharedApplication()
+        visible = [w for w in app.windows() if w.isVisible()]
+        if not visible:
+            logging.info("video window not created yet (try %d), waiting for first frame..",
+                         focus_macos_video_window.tries)
+            return focus_macos_video_window.tries < 15
+        for window in visible:
+            window.center()
+            window.makeKeyAndOrderFront_(None)
+        app.activateIgnoringOtherApps_(True)
+        logging.info("video window is now visible and focused")
+        return False
+    except Exception as e:
+        logging.warning("Unable to focus video window: %s", e)
+        return False
+
+
+focus_macos_video_window.tries = 0
+
+
+def run_consumer_loop(consumer):
+    """Run the GStreamer GLib main loop.
+
+    On macOS the Cocoa run loop must be serviced on the main thread, or the
+    GStreamer video window is created unreliably (sometimes never, sometimes
+    on the wrong display). At the same time the main thread must keep
+    executing Python code for signal handlers (Ctrl-C) to run, so we cannot
+    hand the thread over to a pure Cocoa loop (gst_macos_main). Iterating
+    both loops alternately satisfies the two requirements.
+    """
+    stopSignal = consumer.stopSignal
+    if sys.platform != 'darwin' or stopSignal is None:
+        consumer.loop.run()
+        return
+
+    try:
+        import objc
+        objc.loadBundle('AppKit', {}, bundle_path='/System/Library/Frameworks/AppKit.framework')
+        NSRunLoop = objc.lookUpClass('NSRunLoop')
+        NSDate = objc.lookUpClass('NSDate')
+        cocoa_run_loop = NSRunLoop.mainRunLoop()
+    except Exception as e:
+        logging.warning("Unable to use NSRunLoop (%s); falling back to plain GLib loop", e)
+        consumer.loop.run()
+        return
+
+    context = consumer.loop.get_context()
+    while not stopSignal.isSet():
+        # run pending GLib sources (bus watch, timers) -> Python runs -> signals handled
+        context.iteration(may_block=False)
+        # service the Cocoa run loop on the main thread (needed by the GL video sink)
+        cocoa_run_loop.runMode_beforeDate_('NSDefaultRunLoopMode',
+                                            NSDate.dateWithTimeIntervalSinceNow_(0.01))
 
 
 
@@ -119,10 +205,21 @@ class GstAdapter(Consumer):
         self.pipeline = pipeline
         self.loop = loop
         self.stopSignal = stopSignal
+        self.firstVideoSample = True
+        self.videoSampleCount = 0
+        self.audioSampleCount = 0
+        if loop is not None:
+            GLib.timeout_add_seconds(5, self._log_stream_stats)
+
+    def _log_stream_stats(self):
+        logging.info("stream stats: %d video samples, %d audio samples",
+                     self.videoSampleCount, self.audioSampleCount)
+        return True
 
     @classmethod
     def new(cls, stopSignal):
-        Gst.init(None)
+        ensure_macos_nsapplication()
+        Gst.init([])
         logging.info("Starting Gstreamer..")
 
         # fix Gst plugin path issue in brew:
@@ -141,19 +238,29 @@ class GstAdapter(Consumer):
         setup_live_playAudio(pipe)
         pipe.set_state(Gst.State.PLAYING)
         loop = run_main_loop(pipe,stopSignal)
+        if sys.platform == 'darwin':
+            # the video window is created lazily on first frame; keep focusing until it shows up
+            GLib.timeout_add_seconds(1, focus_macos_video_window)
         # _thread.start_new_thread(run_main_loop, (pipe,))
         logging.info("Gstreamer is running!")
-        return cls(videoAppSrc, audioAppSrc, True, loop)
+        return cls(videoAppSrc, audioAppSrc, True, loop, pipe, stopSignal)
 
     def consume(self, data: CMSampleBuffer):
         if data.MediaType == DescriptorConst.MediaTypeSound:
+            self.audioSampleCount += 1
             if self.firstAudioSample:
                 self.firstAudioSample = False
                 self.send_wav_header()
             return self.send_audio_sample(data)
 
+        self.videoSampleCount += 1
+
         if data.OutputPresentationTimestamp.CMTimeValue > 17446044073700192000:
             data.OutputPresentationTimestamp.CMTimeValue = 0
+
+        if self.firstVideoSample:
+            self.firstVideoSample = False
+            logging.info("first video sample received")
 
         if data.HasFormatDescription:
             data.OutputPresentationTimestamp.CMTimeValue = 0
