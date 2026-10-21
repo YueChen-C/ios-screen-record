@@ -28,11 +28,20 @@ class AyncConst(enum.IntEnum):
     HPA0 = 0x68706130
 
 
-def create_hpd1_device():
+def create_hpd1_device(valeria=True):
+    """构造 HPD1 设备能力描述。
+
+    :param valeria: 是否携带 'Valeria' 能力位。True 时设备进入演示模式,
+                    镜像画面状态栏固定显示 9:41(苹果发布会经典时间);
+                    False 时不发送该键,状态栏显示手机当前真实时间。
+                    默认 True,保持既有行为。
+    """
     resultDict = {
         'Valeria': True,
         'HEVCDecoderSupports444': True
     }
+    if not valeria:
+        del resultDict['Valeria']
     displaySizeDict = {
         'Width': NSNumber(6, 1920),
         'Height': NSNumber(6, 1200),

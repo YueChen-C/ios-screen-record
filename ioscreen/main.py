@@ -9,7 +9,7 @@ def cmd_record_wav(args: argparse.Namespace):
     consumer = AVFileWriter(h264FilePath=args.h264File, wavFilePath=args.wavFile)
     stopSignal = threading.Event()
     register_signal(stopSignal)
-    start_reading(consumer, device, stopSignal)
+    start_reading(consumer, device, stopSignal, valeria=not args.no_valeria)
 
 
 def cmd_record_udp(args: argparse.Namespace):
@@ -17,7 +17,7 @@ def cmd_record_udp(args: argparse.Namespace):
     consumer = SocketUDP()
     stopSignal = threading.Event()
     register_signal(stopSignal)
-    start_reading(consumer, device, stopSignal)
+    start_reading(consumer, device, stopSignal, valeria=not args.no_valeria)
 
 
 def cmd_record_gstreamer(args: argparse.Namespace):
@@ -26,7 +26,7 @@ def cmd_record_gstreamer(args: argparse.Namespace):
     stopSignal = threading.Event()
     register_signal(stopSignal)
     consumer = GstAdapter.new(stopSignal)
-    _thread.start_new_thread(start_reading, (consumer, device, stopSignal,))
+    _thread.start_new_thread(start_reading, (consumer, device, stopSignal, not args.no_valeria,))
     run_consumer_loop(consumer)
 
 
@@ -34,6 +34,9 @@ def main():
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers(dest='subparser')
     parser.add_argument("-u", "--udid", help="specify unique device identifier")
+    parser.add_argument("--no-valeria", action="store_true",
+                        help="do not send the 'Valeria' capability in HPD1; the mirrored "
+                             "screen shows the device's real clock instead of the demo time 9:41")
     gstreamer_parser = subparsers.add_parser("gstreamer",
                                               help="record will open a new window and push AV data to gstreamer.")
     gstreamer_parser.set_defaults(func=cmd_record_gstreamer)

@@ -25,7 +25,7 @@ class MessageProcessor:
     lastEatFrameReceivedLocalAudioClockTime = None
     releaseWaiter = threading.Event()  # 主动结束回调
 
-    def __init__(self, device, inEndpoint, outEndpoint, stopSignal, cmSampleBufConsumer: Consumer):
+    def __init__(self, device, inEndpoint, outEndpoint, stopSignal, cmSampleBufConsumer: Consumer, valeria=True):
         self.device = device
         self.inEndpoint = inEndpoint  # 输出数据端口
         self.outEndpoint = outEndpoint  # 写入数据端口
@@ -33,6 +33,9 @@ class MessageProcessor:
         self.localAudioClock = None
         self.deviceAudioClockRef = None
         self.cmSampleBufConsumer: Consumer = cmSampleBufConsumer  # 处理输出数据
+        # HPD1 是否携带 'Valeria' 能力位
+        # (True: 镜像画面状态栏显示演示时间 9:41;False: 显示手机真实时间)
+        self.valeria = valeria
 
     def usbWrite(self, data):
         # print('写入:',data)
@@ -52,7 +55,7 @@ class MessageProcessor:
             clockRef = cwpaPacket.DeviceClockRef + 1000
             self.localAudioClock = CMClock.new(clockRef)
             self.deviceAudioClockRef = cwpaPacket.DeviceClockRef
-            deviceInfo = new_asyn_dict_packet(create_hpd1_device(), AyncConst.HPD1, 1)
+            deviceInfo = new_asyn_dict_packet(create_hpd1_device(self.valeria), AyncConst.HPD1, 1)
             logging.debug("Sending ASYN HPD1")
             self.usbWrite(deviceInfo)
 

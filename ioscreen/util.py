@@ -147,30 +147,30 @@ def register_signal(stopSignal):
         signal.signal(sig, shutdown)
 
 
-def record_wav(device, h264FilePath, wavFilePath, audio_only=False):
+def record_wav(device, h264FilePath, wavFilePath, audio_only=False, valeria=True):
     consumer = AVFileWriter(h264FilePath=h264FilePath, wavFilePath=wavFilePath, audioOnly=audio_only)
     stopSignal = threading.Event()
     register_signal(stopSignal)
-    start_reading(consumer, device, stopSignal)
+    start_reading(consumer, device, stopSignal, valeria=valeria)
 
 
-def record_udp(device, audio_only=False):
+def record_udp(device, audio_only=False, valeria=True):
     consumer = SocketUDP(audioOnly=audio_only)
     stopSignal = threading.Event()
     register_signal(stopSignal)
-    start_reading(consumer, device, stopSignal)
+    start_reading(consumer, device, stopSignal, valeria=valeria)
 
 
-def record_gstreamer(device):
+def record_gstreamer(device, valeria=True):
     from .coremedia.gstreamer import GstAdapter, run_consumer_loop
     stopSignal = threading.Event()
     register_signal(stopSignal)
     consumer = GstAdapter.new(stopSignal)
-    _thread.start_new_thread(start_reading, (consumer, device, stopSignal,))
+    _thread.start_new_thread(start_reading, (consumer, device, stopSignal, valeria,))
     run_consumer_loop(consumer)
 
 
-def start_reading(consumer:Consumer, device:Device, stopSignal: threading.Event = None):
+def start_reading(consumer:Consumer, device:Device, stopSignal: threading.Event = None, valeria=True):
     stopSignal = stopSignal or threading.Event()
     disable_qt_config(device)
     device.set_configuration()
@@ -200,7 +200,7 @@ def start_reading(consumer:Consumer, device:Device, stopSignal: threading.Event 
     logging.info("USB connection ready, waiting for ping..")
 
     message = MessageProcessor(device, inEndpoint=inEndpoint, outEndpoint=outEndpoint, stopSignal=stopSignal,
-                               cmSampleBufConsumer=consumer)
+                               cmSampleBufConsumer=consumer, valeria=valeria)
     byteStream = ByteStream()
 
     def writeStream():
